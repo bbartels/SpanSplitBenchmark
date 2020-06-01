@@ -12,20 +12,28 @@ namespace SpanSplitBenchmark
 
     [MemoryDiagnoser]
     public class Benchmark
-	{
+    {
         private const char SeparatorChar = ',';
         private static string TestString0 = "art,arst,ar,str,st,rst,ar,st,arst,ars,t,arst,arst,art,arst,ar,str,st,rst,ar,st,arst,ars,t,arst,";
         private static string TestString1 = "arstarstarst,arstarstarst,arstarstarst,arstarstarst,arstarstarst,arstarstarst,arstarstarst,arstarstarst";
 
-        private ReadOnlySpan<char> TestSpan(int index) => index == 0 ? TestString0.AsSpan() : TestString1.AsSpan();
+        private ReadOnlySpan<char> TestSpan(int index) => TestString(index).AsSpan();
+        private string TestString(int index) => index == 0 ? TestString0 : TestString1;
 
         [Params(0, 1)]
         public int TestCase { get; set; }
 
-        [Benchmark]
+        [Benchmark(Baseline = true)]
         public void Split_CharSeparator_WithSeparate()
         {
             var enumerator = new SpanSplitEnumerator<char>(TestSpan(TestCase), SeparatorChar);
+            foreach (var _ in enumerator) { }
+        }
+
+        [Benchmark]
+        public void Split_CharSeparator_WithMerged_Perf()
+        {
+            var enumerator = new MergedSpanSplitEnumerator_Perf<char>(TestSpan(TestCase), SeparatorChar);
             foreach (var _ in enumerator) { }
         }
 
@@ -37,19 +45,18 @@ namespace SpanSplitBenchmark
         }
 
         [Benchmark]
-        public void Split_CharSeparator_WithMerged_Perf()
+        public void Split_CharSeparator_StringSplit()
         {
-            var enumerator = new MergedSpanSplitEnumerator_Perf<char>(TestSpan(TestCase), SeparatorChar);
-            foreach (var _ in enumerator) { }
+            foreach (var _ in TestString(TestCase).Split(SeparatorChar)) { }
         }
     }
 	
-	public ref struct MergedSpanSplitEnumerator<T> where T : IEquatable<T>
+    public ref struct MergedSpanSplitEnumerator<T> where T : IEquatable<T>
     {
         private readonly ReadOnlySpan<T> _sequence;
-		private readonly ReadOnlySpan<T> _separators;
+        private readonly ReadOnlySpan<T> _separators;
         private readonly T _separator;
-		private readonly bool _isSequence;
+        private readonly bool _isSequence;
         private readonly int _separatorLength;
         private int _offset;
         private int _index;
